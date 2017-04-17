@@ -1,8 +1,9 @@
 package goinsta
 
 import (
-	response "github.com/ahmdrz/goinsta/response"
 	"net/http/cookiejar"
+
+	response "github.com/ahmdrz/goinsta/response"
 )
 
 type Informations struct {
@@ -16,8 +17,8 @@ type Informations struct {
 }
 
 type Instagram struct {
-	cookie       string
-	cookiejar    *cookiejar.Jar
+	cookie    string
+	Cookiejar *cookiejar.Jar
 
 	IsLoggedIn   bool
 	Informations Informations

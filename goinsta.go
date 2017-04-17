@@ -18,14 +18,15 @@ import (
 	"strings"
 	"time"
 
-	response "github.com/ahmdrz/goinsta/response"
 	"net/http/cookiejar"
+
+	response "github.com/ahmdrz/goinsta/response"
 )
 
 // GetSessions return current instagram session and cookies
 // Maybe need for webpages that use this API
 func (insta *Instagram) GetSessions(url *url.URL) []*http.Cookie {
-	return insta.cookiejar.Cookies(url)
+	return insta.Cookiejar.Cookies(url)
 }
 
 // Const values ,
@@ -112,7 +113,7 @@ func New(username, password string) *Instagram {
 // Login to Instagram.
 // return error if can't send request to instagram server
 func (insta *Instagram) Login() error {
-	insta.cookiejar, _ = cookiejar.New(nil)//newJar()
+	insta.Cookiejar, _ = cookiejar.New(nil) //newJar()
 
 	body, err := insta.sendRequest("si/fetch_headers/?challenge_type=signup&guid="+generateUUID(false), "", true)
 	if err != nil {
@@ -159,7 +160,7 @@ func (insta *Instagram) Login() error {
 // Logout of Instagram
 func (insta *Instagram) Logout() error {
 	_, err := insta.sendRequest("accounts/logout/", "", false)
-	insta.cookiejar = nil
+	insta.Cookiejar = nil
 	return err
 }
 
@@ -245,7 +246,7 @@ func (insta *Instagram) MediaLikers(mediaId string) (response.MediaLikersRespons
 	}
 	resp := response.MediaLikersResponse{}
 	err = json.Unmarshal(body, &resp)
-
+	// fmt.Println(string(body))
 	return resp, err
 }
 
@@ -407,7 +408,9 @@ func (insta *Instagram) GetUsername(username string) (response.GetUsernameRespon
 
 // TagFeed search by tags in instagram
 func (insta *Instagram) TagFeed(tag string) (response.TagFeedsResponse, error) {
-	body, err := insta.sendRequest("feed/tag/"+tag+"/?rank_token="+insta.Informations.RankToken+"&ranked_content=true", "", false)
+	// body, err := insta.sendRequest("feed/tag/"+tag+"/?rank_token="+insta.Informations.RankToken+"&ranked_content=true", "", false)
+	body, err := insta.sendRequest("feed/tag/"+tag+"/?", "", false)
+
 	if err != nil {
 		return response.TagFeedsResponse{}, err
 	}
@@ -460,12 +463,12 @@ func (insta *Instagram) UploadPhoto(photo_path string, photo_caption string, upl
 	req.Header.Set("User-Agent", GOINSTA_USER_AGENT)
 
 	/*tempjar := newJar()
-	for key, value := range insta.cookiejar.cookies { // make a copy of session
+	for key, value := range insta.Cookiejar.cookies { // make a copy of session
 		tempjar.cookies[key] = value
 	}*/
 
 	client := &http.Client{
-		Jar: insta.cookiejar,
+		Jar: insta.Cookiejar,
 	}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -493,22 +496,22 @@ func (insta *Instagram) UploadPhoto(photo_path string, photo_caption string, upl
 			return response.UploadPhotoResponse{}, err
 		}
 
-		var config map[string]interface{} = map[string]interface{} {
-			"_csrftoken": insta.Informations.Token,
+		var config map[string]interface{} = map[string]interface{}{
+			"_csrftoken":   insta.Informations.Token,
 			"media_folder": "Instagram",
-			"source_type": 4,
-			"_uid": insta.Informations.UsernameId,
-			"_uuid": insta.Informations.UUID,
-			"caption": photo_caption,
-			"upload_id": strconv.FormatInt(upload_id, 10),
-			"device": GOINSTA_DEVICE_SETTINGS,
-			"edits": map[string]interface{} {
+			"source_type":  4,
+			"_uid":         insta.Informations.UsernameId,
+			"_uuid":        insta.Informations.UUID,
+			"caption":      photo_caption,
+			"upload_id":    strconv.FormatInt(upload_id, 10),
+			"device":       GOINSTA_DEVICE_SETTINGS,
+			"edits": map[string]interface{}{
 				"crop_original_size": []int{w * 1.0, h * 1.0},
 				"crop_center":        []float32{0.0, 0.0},
 				"crop_zoom":          1.0,
 				"filter_type":        filter_type,
 			},
-			"extra": map[string]interface{} {
+			"extra": map[string]interface{}{
 				"source_width":  w,
 				"source_height": h,
 			},
@@ -569,6 +572,7 @@ func (insta *Instagram) UnFollow(userid string) (response.UnFollowResponse, erro
 
 	body, err := insta.sendRequest("friendships/destroy/"+userid+"/", generateSignature(string(bytes)), false)
 	if err != nil {
+		fmt.Println("error:", err.Error())
 		return response.UnFollowResponse{}, err
 	}
 
@@ -783,7 +787,7 @@ func (insta *Instagram) ChangePassword(newpassword string) ([]byte, error) {
 	return insta.sendRequest("accounts/change_password/", generateSignature(string(bytes)), false)
 }
 
-func (insta *Instagram) Timeline(maxid ...string) ([]byte, error) {
+func (insta *Instagram) Timeline(maxid ...string) (response.UserFeedResponse, error) {
 	nextmaxid := ""
 
 	if len(maxid) == 0 {
@@ -791,10 +795,17 @@ func (insta *Instagram) Timeline(maxid ...string) ([]byte, error) {
 	} else if len(maxid) == 1 {
 		nextmaxid = "&max_id=" + maxid[0]
 	} else {
-		return []byte{}, fmt.Errorf("Incorrect input")
+		return response.UserFeedResponse{}, fmt.Errorf("Incorrect input")
 	}
 
-	return insta.sendRequest("feed/timeline/?rank_token="+insta.Informations.RankToken+"&ranked_content=true"+nextmaxid, "", false)
+	body, err := insta.sendRequest("feed/timeline/?rank_token="+insta.Informations.RankToken+"&ranked_content=true"+nextmaxid, "", false)
+	if err != nil {
+		return response.UserFeedResponse{}, err
+	}
+	resp := response.UserFeedResponse{}
+	err = json.Unmarshal(body, &resp)
+
+	return resp, err
 }
 
 // getImageDimension return image dimension , types is .jpg and .png
@@ -907,7 +918,7 @@ func (insta *Instagram) DirectMessage(recipient string, message string) (respons
 	req.Header.Set("User-Agent", GOINSTA_USER_AGENT)
 
 	client := &http.Client{
-		Jar: insta.cookiejar,
+		Jar: insta.Cookiejar,
 	}
 
 	resp, err := client.Do(req)

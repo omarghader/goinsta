@@ -40,7 +40,7 @@ func (insta *Instagram) sendRequest(endpoint string, post string, login bool) (b
 	req.Header.Set("User-Agent", GOINSTA_USER_AGENT)
 
 	client := &http.Client{
-		Jar: insta.cookiejar,
+		Jar: insta.Cookiejar,
 	}
 	if proxyUrl != "" {
 		proxy, err := url.Parse(proxyUrl)
